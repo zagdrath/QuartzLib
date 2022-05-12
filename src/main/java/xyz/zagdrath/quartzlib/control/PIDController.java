@@ -7,7 +7,8 @@
  * 
  * Author: Cody L. Wellman (zagdrath@member.fsf.org)
  * 
- * Created: Mar 09, 2022 Updated: Mar 09, 2022
+ * Created: Mar 09, 2022
+ * Updated: Mar 12, 2022
  */
 
 package xyz.zagdrath.quartzlib.control;
@@ -17,19 +18,23 @@ public class PIDController {
     private double kI; // Integral gain constant
     private double kD; // Derivative gain constant
 
+    private double kOutput; // Output of the controller
+
     private double kSetpoint; // Setpoint value
 
-    private double kMinOutput = Double.NaN; // Minimum output value
-    private double kMaxOutput = Double.NaN; // Maximum output value
+    private double kTolerance; // Tolerance for error
 
     private double kError; // Error value between setpoint and current value
     private double kLastError; // Error value from previous iteration
 
-    private double kDeltaTime; // Time between iterations
-    private double kLastTime; // Time between previous iterations
+    private double kIntegralError; // Integral error
+    private double kDerivativeError; // Derivative error
 
-    private double kIntegralError; // Integral error value
-    private double kDerivativeError; // Derivative error value
+    private double kDeltaTime; // Time between iterations
+    private double kLastDeltaTime; // Time between previous iterations
+
+    private double kMinOutput = Double.NaN; // Minimum output value
+    private double kMaxOutput = Double.NaN; // Maximum output value
 
     public PIDController(double kP, double kI, double kD) {
         this.kP = kP;
@@ -38,49 +43,65 @@ public class PIDController {
     }
 
     public double calculatePID(double kCurrentTime, double kCurrentValue) {
+        kDeltaTime = (kLastDeltaTime != Double.NaN) ? (kCurrentTime - kLastDeltaTime) : 0.0;
+
         kError = kSetpoint - kCurrentValue;
-        kDeltaTime = (kLastTime != Double.NaN) ? (double) (kCurrentTime - kLastTime) : 0.0;
+        
+        kIntegralError += kError * kDeltaTime;
 
         kDerivativeError = (kDeltaTime != 0.0) ? (kError - kLastError) / kDeltaTime : 0.0;
 
-        kIntegralError += kError * kDeltaTime;
-
         kLastError = kError;
-        kLastTime = kCurrentTime;
+        kLastDeltaTime = kCurrentTime;
 
-        return checkOutputLimits((kP * kError) + (kI * kIntegralError) + (kD * kDerivativeError));
+        kOutput = checkOutputLimits((kP * kError) + (kI * kIntegralError) + (kD * kDerivativeError));
+
+        return kOutput;
     }
 
-    public double getkP() {
+    public void resetPID() {
+        kError = 0.0;
+        kLastError = 0.0;
+    }
+
+    public double getP() {
         return kP;
     }
 
-    public void setkP(double kP) {
-        this.kP = kP;
-    }
-
-    public double getkI() {
+    public double getI() {
         return kI;
     }
 
-    public void setkI(double kI) {
-        this.kI = kI;
-    }
-
-    public double getkD() {
+    public double getD() {
         return kD;
     }
 
-    public void setkD(double kD) {
+    public void setP(double kP) {
+        this.kP = kP;
+    }
+
+    public void setI(double kI) {
+        this.kI = kI;
+    }
+
+    public void setD(double kD) {
         this.kD = kD;
     }
 
-    public double getkSetpoint() {
+    public double getSetpoint() {
         return kSetpoint;
     }
 
-    public void setkSetpoint(double kSetpoint) {
+    public void setSetpoint(double kSetpoint) {
         this.kSetpoint = kSetpoint;
+    }
+
+    public boolean atSetpoint() {
+        if (kOutput == kSetpoint) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private double checkOutputLimits(double kOutput) {
